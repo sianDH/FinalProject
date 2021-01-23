@@ -6,7 +6,6 @@ from gopigo import *
 import math
 import time
 
-
 #turn on encoders of wheels
 enable_encoders()
 
@@ -16,20 +15,12 @@ length = 25.5                        # length of GoPiGo in cm
 front = 11.5                         # distance from center of wheels to front of GoPiGo
 width = 14.5                         # width GoPiGo in cm
 wheel_C = 20                         # circumference of wheel in cm
-#pos = [0,front,0]                    # current position of GoPiGo wrt front of GoPiGo x,y,rot
+pos = [0,front,0]                    # current position of GoPiGo wrt front of GoPiGo x,y,rot
 L = 0                                # encoder val of left wheel
 R = 0                                # encoder val of right wheel
+last_update = 0                      # time at which last position update occured
+r_offset = 11                        # offset to reduce speed_R by so the wheel rotate at the same rate
 
-#encoder_to_distance and angle_x may be useful for getting back on course after collision
-def encoder_to_distance():
-    """
-    Converts encoder reading to distance in cm
-    """ 
-    dis = [0,0] # displacement in cm
-    #18 encoder counts per wheel rotation
-    dis[0] = (enc_read(0)-offset[0]) * wheel_C/18 #left wheel
-    dis[1] = (enc_read(1)-offset[1]) * wheel_C/18 #right wheel
-    return(dis)
 
 def angle_x(curr_angle):
     """
@@ -47,13 +38,11 @@ def angle_x(curr_angle):
 
 
 
-def const_enc(speed,direction,Kp):
+def const_enc(speed,direction):
     """
     Ensures that the wheels turn as expected by keeping difference between encoders constant while driving
     """
-    
-    
-    #initialisation of variables
+    #error variables
     global L, R, offset
     enc_diff = R-L                    #setpoint to make sure diff between enc is constant
     if direction == 'STRAIGHT':       #ensures diff is 0 for driving straight
@@ -62,39 +51,23 @@ def const_enc(speed,direction,Kp):
     L = enc_read(0)-offset[0]         #update Left enc count
     R = enc_read(1)-offset[1]         #update Right enc count
     new_diff = R-L
-
-    count = 0 #for TESTINFFFGGGGG
-    start = time.perf_counter()
-
     error = new_diff - enc_diff
-    error_prev = 0                    #Previous error 
+    error_prev = 0
+
+    #controller variables
     t_prev = -100                     #check time with high res timer
-    Kp = 41                   #Proportional Gain
-    Td = 0.862
-    Ti = 100000000000
-    I = 0
+    Kp = 1                            #Proportional Gain
+    Td = 0                            #Differential time
+    Ti = 100000000000                 #Integral time
+    I = 0                             #Integral summation
     
-    #Set file heading to P gain
-    f = open("ew_P.txt","a")
-    f.write("%d \n" % (Kp))
-    f.close()
 
     #while the wheels are not at the same speed implement controller
     while abs(error) > 0:
         
-        count = 0.1
         t = time.perf_counter()#check time with high res timer
-        
-        if t-start > 1.5:
-            break
-    
-        #print and save data
-        print(Td,Kp,L,R,error,t-t_prev)
-        f = open("ew_P.txt", "a")
-        f.write("%d %f %f\n" % (error, t, t_prev))
-        f.close()
 
-        # PID control equation
+        # PD control equation
         I = I + (1/Ti)*error*(t-t_prev)
         val = Kp*(error + I + (Td*(error - error_prev)/(t-t_prev)))
         
@@ -109,7 +82,6 @@ def const_enc(speed,direction,Kp):
         R = enc_read(1)-offset[1]
         error = R-L
         t_prev = t
-
     return(count)
 
 def drive(speed, direction, strength):
@@ -122,7 +94,7 @@ def drive(speed, direction, strength):
     #speed to drive fwd
     if speed > 0:
         speed_L = speed
-        speed_R = speed - 10
+        speed_R = speed - r_offset #adjust R speed with offset so that wheels move at same speed
     else:
         speed_L = speed
         speed_R = speed
@@ -144,120 +116,50 @@ def drive(speed, direction, strength):
         set_right_speed(speed_R)
 
     #strength should be in increments of 10
-    return(speed_L)
-
-
-"""For Joining and Following"""
-stop = 0 
-pos_car1 = [2,2]
-pos_car2 = [1,1]
-dx = pos_car1[0] - pos_car2[0]
-dy = pos_car1[1] - pos_car2[1]
-setpoint = [0,0]
-image_frame = [0,0]
-Am_leader = 0
-found_car = 0
-collision = 0
-
-
-""" initialisation of cars """
-#send beacon and triangulate position
-#send position to database and car id (car2)
-    #append end of platoon list with car id
-#check if leader id matches my id
-'''
-while stop == 0: #(may need to check more often)
-
-    """ for followers """
-    if Am_leader == 0:
-        """ find car & join platoon """
-        #check database for position of car infront (car1)
-        #use image detection to search for car infront and update found_car
-        while found_car == 0
-            #broadcast joining platoon & update platoon list in database  (blink right  LED)
-            #rotate theta = arctan(dy/dx) degrees
-            #use image detection to search for car infront and update found_car
-            while image_frame != setpoint:
-                #call image analysis
-                #call drive with values from image recognition analysis
-                #send beacon and update position
-                #call const_enc to ensure wheels turn as intended
-                #call image recognition
-                
-        #check database for car infront(car1)
-
-
-        #Now car infront should be found and platoon joined with correct car orientation
-        """ following in platoon """
-        #set speed to speed of car in font
-        #call image recognition and image analysis
-        #drive with values from analysis (cars 15 cm apart)
-        #send beacon and update my position
-        #call const_enc() to ensure wheels turn as intended
-
-        """ leaving platoon """
-        #if t > 10s && leave == 1:
-        #broadcast leaving & update platoon list in database (blink left LED)
-        #start driving sequence to leave platoon
-        #break
-
-    """ for leaders"""
-    else:
-        if collision == 0:
-            #call drive with commands from app
-            #call const_enc() to ensure wheels turn as intended
-        else:
-            #insert collision avoidance scheme here
-
-
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
-#testing  drive()
-#speed = input("\nEnter speed : ")
-#speed = int(speed)
-#direction = input("\nSTRAIGHT, LEFT or RIGHT: ")
-#strength = int(input("\nStrength (0-5): "))
-#drive_leader(speed,direction,strength)
-#time.sleep(1)
-#for i in range(10):
- #   if direction == 'STRAIGHT':
-        
- #   time.sleep(0.5)
     
-#stop()
+    time1 = time.perf_counter()
+    return(speed_L, speed_R, time1)
+
+def position_update(speed_L, speed_R, time1, time2):
+    global pos, last_update
+    
+    #if motors turning
+    if speed_L > 51 or speed_R > 51: 
+        L_ms = ((speed_L * 0.00079)-0.026)      #L speed in m per sec based on speed conversion graph of encoder data
+        R_ms = (((speed_R+r_offset)*0.00079)-0.026)   #R speed in m per sec and compensate for offset to have wheels the same speed
+
+        time2 = time.perf_counter()
+        dt = time2 - time1
+
+        x,y,theta = pos
+        theta = theta + (wheel_C*(R_ms-L_ms)/(2*3.14*width))* dt
+        x = x + (wheel_C*(L_ms+R_ms)*math.sin(angle_x(theta))/(4*3.14))* dt 
+        y = y + (wheel_C*(L_ms+R_ms)*math.cos(angle_x(theta))/(4*3.14))* dt
+        pos = [x,y,theta]
+    last_update = time2
+    print(pos,last_update)
+    pass
 
 
+#testing position update
+start_timer = time.perf_counter()
+enc_count = enc_read(1) - offset[1]
+curr = time.perf_counter()
+sub = float(curr-start_timer)
 
 
-#testing drive() and const_enc()
-for j in range(3):
-   i=41
-#while i < 101: 
-   speed = 100
-   direction = 'RIGHT'
+for j in range(65): 
+   speed = 80
+   direction = 'STRAIGHT'
+
+   speed_L, speed_R, time1= drive(speed, direction, 40)
+   print(speed_L, speed_R)
+   time.sleep(0.1)
+   time2 = time.perf_counter()
+   position_update(speed_L, speed_R, time1, time2)
    
-   speed = drive(speed, direction, 10)
-   L = enc_read(0)-offset[0]
-   R = enc_read(1)-offset[1]
-   print(L,R)
    
-   i+=const_enc(speed,direction,i)
+     
+speed = drive(0,direction,0)#stop
 
-
-stop()
-
-
-        
 '''
